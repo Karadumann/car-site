@@ -181,31 +181,48 @@ app.post('/api/register', async (req, res) => {
         }
 
         // Check if user already exists
-        const existingUser = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?').get(username, email);
-        if (existingUser) {
-            return res.status(400).json({ error: 'Username or email already exists' });
-        }
-        
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
-        
-        // Insert user
-        const result = db.prepare(`
-            INSERT INTO users (username, email, password, fullName, phone)
-            VALUES (?, ?, ?, ?, ?)
-        `).run(username, email, hashedPassword, fullName || null, phone || null);
-        
-        // Generate JWT token
-        const token = jwt.sign(
-            { userId: result.lastInsertRowid, username, email },
-            JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-        
-        res.status(201).json({
-            message: 'User registered successfully',
-            token,
-            user: { id: result.lastInsertRowid, username, email, fullName, phone }
+        db.get('SELECT * FROM users WHERE username = ? OR email = ?', [username, email], async (err, existingUser) => {
+            if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: 'Internal server error' });
+            }
+            
+            if (existingUser) {
+                return res.status(400).json({ error: 'Username or email already exists' });
+            }
+            
+            // Hash password
+            const hashedPassword = await bcrypt.hash(password, 10);
+            
+            // Insert user
+            db.run(`
+                INSERT INTO users (username, email, password, fullName, phone)
+                VALUES (?, ?, ?, ?, ?)
+            `, [username, email, hashedPassword, fullName || null, phone || null], function(err) {
+                if (err) {
+                    console.error('Database error:', err);
+                    return res.status(500).json({ error: 'Internal server error' });
+                }
+                
+                // Generate JWT token
+                const token = jwt.sign(
+                    { userId: this.lastID, username, email },
+                    JWT_SECRET,
+                    { expiresIn: '24h' }
+                );
+                
+                res.status(201).json({
+                    message: 'User registered successfully',
+                    token,
+                    user: {
+                        id: this.lastID,
+                        username,
+                        email,
+                        fullName: fullName || null,
+                        phone: phone || null
+                    }
+                });
+            });
         });
     } catch (error) {
         console.error('Registration error:', error);
@@ -220,15 +237,25 @@ app.put('/api/profile', authenticateToken, async (req, res) => {
         const userId = req.user.userId;
         
         // Update user profile
-        db.prepare(`
+        db.run(`
             UPDATE users SET fullName = ?, phone = ?, updatedAt = CURRENT_TIMESTAMP
             WHERE id = ?
-        `).run(fullName || null, phone || null, userId);
-        
-        // Get updated user data
-        const updatedUser = db.prepare('SELECT id, username, email, fullName, phone FROM users WHERE id = ?').get(userId);
-        
-        res.json(updatedUser);
+        `, [fullName || null, phone || null, userId], function(err) {
+            if (err) {
+                console.error('Profile update error:', err);
+                return res.status(500).json({ error: 'Internal server error' });
+            }
+            
+            // Get updated user data
+            db.get('SELECT id, username, email, fullName, phone FROM users WHERE id = ?', [userId], (err, updatedUser) => {
+                if (err) {
+                    console.error('Profile fetch error:', err);
+                    return res.status(500).json({ error: 'Internal server error' });
+                }
+                
+                res.json(updatedUser);
+            });
+        });
     } catch (error) {
         console.error('Profile update error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -252,24 +279,29 @@ app.post('/api/listings', authenticateToken, upload.any(), async (req, res) => {
         }
         
         // Insert listing
-        const result = db.prepare(`
+        db.run(`
             INSERT INTO listings (
                 userId, make, model, year, price, mileage, color,
                 fuelType, transmission, engineSize, doors,
                 description, features
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
+        `, [
             userId, make, model, parseInt(year), parseFloat(price),
             mileage ? parseInt(mileage) : null, color,
             fuelType, transmission,
             engineSize ? parseFloat(engineSize) : null,
             doors ? parseInt(doors) : null,
             description, features
-        );
-        
-        res.status(201).json({
-            message: 'Listing created successfully',
-            listingId: result.lastInsertRowid
+        ], function(err) {
+            if (err) {
+                console.error('Listing creation error:', err);
+                return res.status(500).json({ error: 'Internal server error' });
+            }
+            
+            res.status(201).json({
+                message: 'Listing created successfully',
+                listingId: this.lastID
+            });
         });
     } catch (error) {
         console.error('Listing creation error:', error);
@@ -281,11 +313,16 @@ app.post('/api/listings', authenticateToken, upload.any(), async (req, res) => {
 app.get('/api/listings/user', authenticateToken, (req, res) => {
     try {
         const userId = req.user.userId;
-        const listings = db.prepare(`
+        db.all(`
             SELECT * FROM listings WHERE userId = ? ORDER BY createdAt DESC
-        `).all(userId);
-        
-        res.json(listings);
+        `, [userId], (err, listings) => {
+            if (err) {
+                console.error('Get user listings error:', err);
+                return res.status(500).json({ error: 'Internal server error' });
+            }
+            
+            res.json(listings);
+        });
     } catch (error) {
         console.error('Get user listings error:', error);
         res.status(500).json({ error: 'Internal server error' });
@@ -512,70 +549,6 @@ app.get('/car-detail.html', (req, res) => {
 });
 
 // Start server
-// Favorites API
-app.post('/api/favorites', authenticateToken, (req, res) => {
-    try {
-        const { listingId } = req.body;
-        const userId = req.user.userId;
-        
-        db.run(
-            'INSERT INTO favorites (userId, listingId) VALUES (?, ?)',
-            [userId, listingId],
-            function(err) {
-                if (err) {
-                    if (err.message.includes('UNIQUE constraint failed')) {
-                        return res.status(400).json({ error: 'Already in favorites' });
-                    }
-                    return res.status(500).json({ error: 'Database error' });
-                }
-                res.json({ message: 'Added to favorites', id: this.lastID });
-            }
-        );
-    } catch (error) {
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-app.delete('/api/favorites/:listingId', authenticateToken, (req, res) => {
-    try {
-        const { listingId } = req.params;
-        const userId = req.user.userId;
-        
-        db.run(
-            'DELETE FROM favorites WHERE userId = ? AND listingId = ?',
-            [userId, listingId],
-            function(err) {
-                if (err) {
-                    return res.status(500).json({ error: 'Database error' });
-                }
-                res.json({ message: 'Removed from favorites' });
-            }
-        );
-    } catch (error) {
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-app.get('/api/favorites', authenticateToken, (req, res) => {
-    try {
-        const userId = req.user.userId;
-        
-        db.all(
-            `SELECT l.* FROM listings l 
-             INNER JOIN favorites f ON l.id = f.listingId 
-             WHERE f.userId = ? AND l.status = 'active'`,
-            [userId],
-            (err, rows) => {
-                if (err) {
-                    return res.status(500).json({ error: 'Database error' });
-                }
-                res.json(rows);
-            }
-        );
-    } catch (error) {
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
 
 // Admin middleware
 function requireAdmin(req, res, next) {
