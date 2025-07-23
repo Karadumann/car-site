@@ -143,10 +143,12 @@ const userName = document.getElementById('userName');
 const logoutBtn = document.getElementById('logoutBtn');
 
 // Mobile menu toggle
-hamburger.addEventListener('click', () => {
-    hamburger.classList.toggle('active');
-    navMenu.classList.toggle('active');
-});
+if (hamburger && navMenu) {
+    hamburger.addEventListener('click', () => {
+        hamburger.classList.toggle('active');
+        navMenu.classList.toggle('active');
+    });
+}
 
 // Close mobile menu when clicking on a link
 document.querySelectorAll('.nav-menu a').forEach(link => {
@@ -160,30 +162,44 @@ document.querySelectorAll('.nav-menu a').forEach(link => {
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
         e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
-        if (target) {
-            target.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
+        const href = this.getAttribute('href');
+        if (href && href !== '#') {
+            const target = document.querySelector(href);
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
         }
     });
 });
 
 // CTA button scroll to cars section
-ctaButton.addEventListener('click', () => {
-    document.getElementById('cars').scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
+if (ctaButton) {
+    ctaButton.addEventListener('click', () => {
+        const carsSection = document.getElementById('cars');
+        if (carsSection) {
+            carsSection.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        }
     });
-});
+}
 
 // Create car card HTML
 function createCarCard(car) {
+    const token = localStorage.getItem('authToken');
+    const favoriteBtn = token ? `<button class="favorite-btn" onclick="toggleFavorite(${car.id}, this)" title="Add to favorites">
+                    <i class="far fa-heart"></i>
+                </button>` : '';
+    
     return `
         <div class="car-card" data-category="${car.category}">
             <div class="car-image">
                 <i class="${car.icon}"></i>
+                ${favoriteBtn}
             </div>
             <div class="car-info">
                 <h3>${car.name}</h3>
@@ -201,16 +217,18 @@ function createCarCard(car) {
 
 // Load cars into grid
 function loadCars(carsToShow = cars) {
-    carsGrid.innerHTML = carsToShow.map(car => createCarCard(car)).join('');
-    
-    // Add loading animation
-    const carCards = document.querySelectorAll('.car-card');
-    carCards.forEach((card, index) => {
-        card.classList.add('loading');
-        setTimeout(() => {
-            card.classList.add('loaded');
-        }, index * 100);
-    });
+    if (carsGrid) {
+        carsGrid.innerHTML = carsToShow.map(car => createCarCard(car)).join('');
+        
+        // Add loading animation
+        const carCards = document.querySelectorAll('.car-card');
+        carCards.forEach((card, index) => {
+            card.classList.add('loading');
+            setTimeout(() => {
+                card.classList.add('loaded');
+            }, index * 100);
+        });
+    }
 }
 
 // Filter cars by category
@@ -228,22 +246,78 @@ function filterCars(category) {
 }
 
 // Filter button event listeners
-filterButtons.forEach(button => {
-    button.addEventListener('click', () => {
-        // Remove active class from all buttons
-        filterButtons.forEach(btn => btn.classList.remove('active'));
-        // Add active class to clicked button
-        button.classList.add('active');
-        
-        // Filter cars
-        const category = button.getAttribute('data-filter');
-        filterCars(category);
+if (filterButtons) {
+    filterButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            // Remove active class from all buttons
+            filterButtons.forEach(btn => btn.classList.remove('active'));
+            // Add active class to clicked button
+            button.classList.add('active');
+            
+            // Filter cars
+            const category = button.getAttribute('data-filter');
+            filterCars(category);
+        });
     });
-});
+}
 
 // Navigate to car detail page
 function goToCarDetail(carId) {
     window.location.href = `car-detail.html?id=${carId}`;
+}
+
+// Toggle favorite
+async function toggleFavorite(carId, button) {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+        alert('Please login to add favorites');
+        return;
+    }
+    
+    const icon = button.querySelector('i');
+    const isFavorited = icon.classList.contains('fas');
+    
+    try {
+        if (isFavorited) {
+            // Remove from favorites
+            const response = await fetch(`/api/favorites/${carId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (response.ok) {
+                icon.classList.remove('fas');
+                icon.classList.add('far');
+                button.title = 'Add to favorites';
+            }
+        } else {
+            // Add to favorites
+            const response = await fetch('/api/favorites', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ listingId: carId })
+            });
+            
+            if (response.ok) {
+                icon.classList.remove('far');
+                icon.classList.add('fas');
+                button.title = 'Remove from favorites';
+            } else if (response.status === 400) {
+                // Already in favorites
+                icon.classList.remove('far');
+                icon.classList.add('fas');
+                button.title = 'Remove from favorites';
+            }
+        }
+    } catch (error) {
+        console.error('Error toggling favorite:', error);
+        alert('Error updating favorites');
+    }
 }
 
 // Show car details (modal functionality - backup)
@@ -255,22 +329,24 @@ function showCarDetails(carId) {
 }
 
 // Contact form submission
-contactForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    
-    const formData = new FormData(contactForm);
-    const name = contactForm.querySelector('input[type="text"]').value;
-    const email = contactForm.querySelector('input[type="email"]').value;
-    const message = contactForm.querySelector('textarea').value;
-    
-    if (name && email && message) {
-        // Simulate form submission
-        alert('Your message has been sent successfully! We will get back to you as soon as possible.');
-        contactForm.reset();
-    } else {
-        alert('Please fill in all fields.');
-    }
-});
+if (contactForm) {
+    contactForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const formData = new FormData(contactForm);
+        const name = contactForm.querySelector('input[type="text"]').value;
+        const email = contactForm.querySelector('input[type="email"]').value;
+        const message = contactForm.querySelector('textarea').value;
+        
+        if (name && email && message) {
+            // Simulate form submission
+            alert('Your message has been sent successfully! We will get back to you as soon as possible.');
+            contactForm.reset();
+        } else {
+            alert('Please fill in all fields.');
+        }
+    });
+}
 
 // Scroll animations
 function animateOnScroll() {
@@ -345,9 +421,11 @@ function logout() {
 // User menu toggle
 if (userMenu) {
     const userInfo = userMenu.querySelector('.user-info');
-    userInfo.addEventListener('click', () => {
-        userMenu.classList.toggle('active');
-    });
+    if (userInfo) {
+        userInfo.addEventListener('click', () => {
+            userMenu.classList.toggle('active');
+        });
+    }
     
     // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
@@ -355,13 +433,19 @@ if (userMenu) {
             userMenu.classList.remove('active');
         }
     });
+    
+    userMenu.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
 }
 
 // Logout functionality
 if (logoutBtn) {
     logoutBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        logout();
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userData');
+        window.location.href = 'index.html';
     });
 }
 

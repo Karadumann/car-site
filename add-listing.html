@@ -525,6 +525,12 @@
         const user = JSON.parse(userData);
         document.getElementById('userName').textContent = user.username;
         
+        // Show user menu and hide auth buttons
+        const listingAuthButtons = document.getElementById('authButtons');
+        const listingUserMenu = document.getElementById('userMenu');
+        if (listingAuthButtons) listingAuthButtons.style.display = 'none';
+        if (listingUserMenu) listingUserMenu.style.display = 'flex';
+        
         // Populate year dropdown
         const yearSelect = document.getElementById('year');
         const currentYear = new Date().getFullYear();

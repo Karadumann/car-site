@@ -48,6 +48,7 @@ function initializeDatabase() {
             password TEXT NOT NULL,
             fullName TEXT,
             phone TEXT,
+            role TEXT DEFAULT 'user',
             createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
             updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -83,10 +84,11 @@ function initializeDatabase() {
         CREATE TABLE IF NOT EXISTS favorites (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             userId INTEGER NOT NULL,
-            carId TEXT NOT NULL,
+            listingId INTEGER NOT NULL,
             createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (userId) REFERENCES users (id),
-            UNIQUE(userId, carId)
+            FOREIGN KEY (listingId) REFERENCES listings (id),
+            UNIQUE(userId, listingId)
         )
     `);
     
@@ -103,6 +105,17 @@ function initializeDatabase() {
             FOREIGN KEY (userId) REFERENCES users (id)
         )
     `);
+    
+    // Create default admin user
+    const adminExists = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
+    if (!adminExists) {
+        const hashedPassword = bcrypt.hashSync('admin', 10);
+        db.prepare(`
+            INSERT INTO users (username, email, password, fullName, role)
+            VALUES (?, ?, ?, ?, ?)
+        `).run('admin', 'admin@automax.com', hashedPassword, 'Administrator', 'admin');
+        console.log('Default admin user created: admin/admin');
+    }
     
     console.log('Database tables initialized');
 }
@@ -288,7 +301,7 @@ app.post('/api/login', (req, res) => {
 
             // Generate JWT token
             const token = jwt.sign(
-                { id: user.id, username: user.username, email: user.email },
+                { userId: user.id, username: user.username, email: user.email, role: user.role },
                 JWT_SECRET,
                 { expiresIn: '24h' }
             );
@@ -300,7 +313,8 @@ app.post('/api/login', (req, res) => {
                     id: user.id,
                     username: user.username,
                     email: user.email,
-                    fullName: user.full_name
+                    fullName: user.fullName,
+                    role: user.role
                 }
             });
         });
@@ -433,6 +447,147 @@ app.get('/car-detail.html', (req, res) => {
 });
 
 // Start server
+// Favorites API
+app.post('/api/favorites', authenticateToken, (req, res) => {
+    try {
+        const { listingId } = req.body;
+        const userId = req.user.userId;
+        
+        db.run(
+            'INSERT INTO favorites (userId, listingId) VALUES (?, ?)',
+            [userId, listingId],
+            function(err) {
+                if (err) {
+                    if (err.message.includes('UNIQUE constraint failed')) {
+                        return res.status(400).json({ error: 'Already in favorites' });
+                    }
+                    return res.status(500).json({ error: 'Database error' });
+                }
+                res.json({ message: 'Added to favorites', id: this.lastID });
+            }
+        );
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.delete('/api/favorites/:listingId', authenticateToken, (req, res) => {
+    try {
+        const { listingId } = req.params;
+        const userId = req.user.userId;
+        
+        db.run(
+            'DELETE FROM favorites WHERE userId = ? AND listingId = ?',
+            [userId, listingId],
+            function(err) {
+                if (err) {
+                    return res.status(500).json({ error: 'Database error' });
+                }
+                res.json({ message: 'Removed from favorites' });
+            }
+        );
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.get('/api/favorites', authenticateToken, (req, res) => {
+    try {
+        const userId = req.user.userId;
+        
+        db.all(
+            `SELECT l.* FROM listings l 
+             INNER JOIN favorites f ON l.id = f.listingId 
+             WHERE f.userId = ? AND l.status = 'active'`,
+            [userId],
+            (err, rows) => {
+                if (err) {
+                    return res.status(500).json({ error: 'Database error' });
+                }
+                res.json(rows);
+            }
+        );
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Admin middleware
+function requireAdmin(req, res, next) {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Admin access required' });
+    }
+    next();
+}
+
+// Admin API - Get all listings
+app.get('/api/admin/listings', authenticateToken, requireAdmin, (req, res) => {
+    try {
+        db.all(
+            `SELECT l.*, u.username as ownerUsername 
+             FROM listings l 
+             LEFT JOIN users u ON l.userId = u.id 
+             ORDER BY l.createdAt DESC`,
+            [],
+            (err, rows) => {
+                if (err) {
+                    return res.status(500).json({ error: 'Database error' });
+                }
+                res.json(rows);
+            }
+        );
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Admin API - Delete listing
+app.delete('/api/admin/listings/:id', authenticateToken, requireAdmin, (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        db.run(
+            'DELETE FROM listings WHERE id = ?',
+            [id],
+            function(err) {
+                if (err) {
+                    return res.status(500).json({ error: 'Database error' });
+                }
+                if (this.changes === 0) {
+                    return res.status(404).json({ error: 'Listing not found' });
+                }
+                res.json({ message: 'Listing deleted successfully' });
+            }
+        );
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Admin API - Update listing status
+app.put('/api/admin/listings/:id/status', authenticateToken, requireAdmin, (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+        
+        db.run(
+            'UPDATE listings SET status = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?',
+            [status, id],
+            function(err) {
+                if (err) {
+                    return res.status(500).json({ error: 'Database error' });
+                }
+                if (this.changes === 0) {
+                    return res.status(404).json({ error: 'Listing not found' });
+                }
+                res.json({ message: 'Listing status updated successfully' });
+            }
+        );
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
