@@ -190,16 +190,10 @@ if (ctaButton) {
 
 // Create car card HTML
 function createCarCard(car) {
-    const token = localStorage.getItem('authToken');
-    const favoriteBtn = token ? `<button class="favorite-btn" onclick="toggleFavorite(${car.id}, this)" title="Add to favorites">
-                    <i class="far fa-heart"></i>
-                </button>` : '';
-    
     return `
         <div class="car-card" data-category="${car.category}">
             <div class="car-image">
                 <i class="${car.icon}"></i>
-                ${favoriteBtn}
             </div>
             <div class="car-info">
                 <h3>${car.name}</h3>
@@ -216,9 +210,51 @@ function createCarCard(car) {
 }
 
 // Load cars into grid
-function loadCars(carsToShow = cars) {
+async function loadCars(carsToShow = null) {
     if (carsGrid) {
-        carsGrid.innerHTML = carsToShow.map(car => createCarCard(car)).join('');
+        let carsData = carsToShow;
+        
+        // If no specific cars provided, try to fetch from database
+        if (!carsData) {
+            try {
+                const response = await fetch('/api/listings');
+                if (response.ok) {
+                    const dbCars = await response.json();
+                    // Check if dbCars is an array
+                    if (Array.isArray(dbCars)) {
+                        // Convert database format to display format
+                        carsData = dbCars.map(car => ({
+                            id: car.id,
+                            name: `${car.make} ${car.model}`,
+                            price: `$${car.price.toLocaleString()}`,
+                            category: getCategoryFromMake(car.make),
+                            year: car.year.toString(),
+                            fuel: car.fuelType,
+                            transmission: car.transmission,
+                            icon: getIconFromMake(car.make),
+                            description: car.description,
+                            features: [],
+                            engine: '',
+                            horsepower: '',
+                            mpg: '',
+                            color: ''
+                        }));
+                    } else {
+                        // If no valid data from database, show empty
+                        carsData = [];
+                    }
+                } else {
+                    // If API fails, show empty
+                    carsData = [];
+                }
+            } catch (error) {
+                console.error('Error loading cars from database:', error);
+                // If error, show empty
+                carsData = [];
+            }
+        }
+        
+        carsGrid.innerHTML = carsData.map(car => createCarCard(car)).join('');
         
         // Add loading animation
         const carCards = document.querySelectorAll('.car-card');
@@ -229,6 +265,28 @@ function loadCars(carsToShow = cars) {
             }, index * 100);
         });
     }
+}
+
+// Helper function to get category from make
+function getCategoryFromMake(make) {
+    const suvMakes = ['Audi', 'Toyota', 'Volvo'];
+    const sedanMakes = ['BMW', 'Mercedes', 'Honda'];
+    const hatchbackMakes = ['Volkswagen', 'Ford'];
+    
+    if (suvMakes.includes(make)) return 'suv';
+    if (sedanMakes.includes(make)) return 'sedan';
+    if (hatchbackMakes.includes(make)) return 'hatchback';
+    return 'sedan'; // default
+}
+
+// Helper function to get icon from make
+function getIconFromMake(make) {
+    const suvMakes = ['Audi', 'Toyota', 'Volvo'];
+    const hatchbackMakes = ['Volkswagen', 'Ford'];
+    
+    if (suvMakes.includes(make)) return 'fas fa-car-side';
+    if (hatchbackMakes.includes(make)) return 'fas fa-car-alt';
+    return 'fas fa-car'; // default for sedans
 }
 
 // Filter cars by category

@@ -6,6 +6,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
+const multer = require('multer');
 const path = require('path');
 
 const app = express();
@@ -24,8 +25,27 @@ app.use(session({
     cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24 hours
 }));
 
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/')
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname))
+    }
+});
+
+const upload = multer({ 
+    storage: storage,
+    fileFilter: function (req, file, cb) {
+        // Accept any file type for now
+        cb(null, true);
+    }
+});
+
 // Serve static files
 app.use(express.static(path.join(__dirname)));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Initialize SQLite database
 const db = new sqlite3.Database('./automax.db', (err) => {
@@ -107,15 +127,25 @@ function initializeDatabase() {
     `);
     
     // Create default admin user
-    const adminExists = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
-    if (!adminExists) {
-        const hashedPassword = bcrypt.hashSync('admin', 10);
-        db.prepare(`
-            INSERT INTO users (username, email, password, fullName, role)
-            VALUES (?, ?, ?, ?, ?)
-        `).run('admin', 'admin@automax.com', hashedPassword, 'Administrator', 'admin');
-        console.log('Default admin user created: admin/admin');
-    }
+    db.get('SELECT * FROM users WHERE username = ?', ['admin'], (err, adminExists) => {
+        if (err) {
+            console.error('Error checking admin user:', err);
+            return;
+        }
+        if (!adminExists) {
+            const hashedPassword = bcrypt.hashSync('admin', 10);
+            db.run(`
+                INSERT INTO users (username, email, password, fullName, role)
+                VALUES (?, ?, ?, ?, ?)
+            `, ['admin', 'admin@automax.com', hashedPassword, 'Administrator', 'admin'], function(err) {
+                if (err) {
+                    console.error('Error creating admin user:', err);
+                } else {
+                    console.log('Default admin user created: admin/admin');
+                }
+            });
+        }
+    });
     
     console.log('Database tables initialized');
 }
@@ -206,7 +236,7 @@ app.put('/api/profile', authenticateToken, async (req, res) => {
 });
 
 // Create listing
-app.post('/api/listings', authenticateToken, async (req, res) => {
+app.post('/api/listings', authenticateToken, upload.any(), async (req, res) => {
     try {
         const {
             make, model, year, price, mileage, color,
@@ -215,6 +245,11 @@ app.post('/api/listings', authenticateToken, async (req, res) => {
         } = req.body;
         
         const userId = req.user.userId;
+        
+        // Validate required fields
+        if (!make || !model || !year || !price) {
+            return res.status(400).json({ error: 'Make, model, year, and price are required' });
+        }
         
         // Insert listing
         const result = db.prepare(`
@@ -260,16 +295,46 @@ app.get('/api/listings/user', authenticateToken, (req, res) => {
 // Get all listings
 app.get('/api/listings', (req, res) => {
     try {
-        const listings = db.prepare(`
+        db.all(`
             SELECT l.*, u.username as ownerUsername
             FROM listings l
             JOIN users u ON l.userId = u.id
             ORDER BY l.createdAt DESC
-        `).all();
-        
-        res.json(listings);
+        `, [], (err, listings) => {
+            if (err) {
+                console.error('Get listings error:', err);
+                res.status(500).json({ error: 'Internal server error' });
+            } else {
+                res.json(listings);
+            }
+        });
     } catch (error) {
         console.error('Get listings error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Get single listing
+app.get('/api/listings/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        db.get(`
+            SELECT l.*, u.username as ownerUsername
+            FROM listings l
+            JOIN users u ON l.userId = u.id
+            WHERE l.id = ?
+        `, [id], (err, listing) => {
+            if (err) {
+                console.error('Get listing error:', err);
+                res.status(500).json({ error: 'Internal server error' });
+            } else if (!listing) {
+                res.status(404).json({ error: 'Listing not found' });
+            } else {
+                res.json(listing);
+            }
+        });
+    } catch (error) {
+        console.error('Get listing error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

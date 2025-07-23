@@ -495,12 +495,19 @@
                 
                 // Remove active class from all items
                 navItems.forEach(nav => nav.classList.remove('active'));
-                sections.forEach(section => section.classList.remove('active'));
+                sections.forEach(section => {
+                    section.classList.remove('active');
+                    section.style.display = 'none';
+                });
                 
                 // Add active class to clicked item
                 item.classList.add('active');
                 const sectionId = item.dataset.section;
-                document.getElementById(sectionId).classList.add('active');
+                const targetSection = document.getElementById(sectionId);
+                if (targetSection) {
+                    targetSection.style.display = 'block';
+                    targetSection.classList.add('active');
+                }
             });
         });
         

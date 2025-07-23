@@ -147,6 +147,22 @@
             transform: translateY(-2px);
         }
         
+        .btn-favorite {
+            background: transparent;
+            color: #e74c3c;
+            border: 2px solid #e74c3c;
+        }
+        
+        .btn-favorite:hover {
+            background: #e74c3c;
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .btn-favorite i {
+            margin-right: 8px;
+        }
+        
         .section-title {
             font-size: 1.8rem;
             margin-bottom: 1.5rem;
@@ -401,8 +417,39 @@
         });
         
         // Load car details
-        function loadCarDetails() {
-            const car = cars.find(c => c.id === carId);
+        async function loadCarDetails() {
+            let car = null;
+            
+            // Try to fetch from database first
+            try {
+                const response = await fetch(`/api/listings/${carId}`);
+                if (response.ok) {
+                    const dbCar = await response.json();
+                    car = {
+                        id: dbCar.id,
+                        name: `${dbCar.make} ${dbCar.model}`,
+                        price: `$${dbCar.price.toLocaleString()}`,
+                        category: getCategoryFromMake(dbCar.make),
+                        year: dbCar.year.toString(),
+                        fuel: dbCar.fuelType,
+                        transmission: dbCar.transmission,
+                        icon: getIconFromMake(dbCar.make),
+                        description: dbCar.description || 'No description available.',
+                        features: ['Air Conditioning', 'Power Steering', 'ABS Brakes', 'Airbags'],
+                        engine: '2.0L',
+                        horsepower: '150 HP',
+                        mpg: '25 MPG',
+                        color: 'Black'
+                    };
+                } else {
+                    // Fallback to static data
+                    car = cars.find(c => c.id === carId);
+                }
+            } catch (error) {
+                console.error('Error loading car from database:', error);
+                // Fallback to static data
+                car = cars.find(c => c.id === carId);
+            }
             
             if (!car) {
                 carDetailContainer.innerHTML = `
@@ -480,11 +527,25 @@
                     <div class="car-actions">
                         <button class="car-action-btn btn-primary" onclick="scheduleTestDrive(${car.id})">Schedule Test Drive</button>
                         <button class="car-action-btn btn-secondary" onclick="contactDealer(${car.id})">Contact Dealer</button>
+                        <button class="car-action-btn btn-favorite" id="favoriteBtn" onclick="toggleFavorite(${car.id}, this)" style="display: none;">
+                            <i class="far fa-heart"></i> Add to Favorites
+                        </button>
                     </div>
                 </div>
             `;
             
             carDetailContainer.innerHTML = carDetailHTML;
+            
+            // Show favorite button if user is logged in
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                const favoriteBtn = document.getElementById('favoriteBtn');
+                if (favoriteBtn) {
+                    favoriteBtn.style.display = 'inline-block';
+                    // Check if car is already in favorites
+                    checkFavoriteStatus(car.id, favoriteBtn);
+                }
+            }
             
             // Load related cars (same category)
             loadRelatedCars(car);
@@ -535,6 +596,114 @@
         // Navigate to car detail
         function goToCarDetail(carId) {
             window.location.href = `car-detail.html?id=${carId}`;
+        }
+        
+        // Helper function to get category from make
+        function getCategoryFromMake(make) {
+            const suvMakes = ['Audi', 'Toyota', 'Volvo'];
+            const sedanMakes = ['BMW', 'Mercedes', 'Honda'];
+            const hatchbackMakes = ['Volkswagen', 'Ford'];
+            
+            if (suvMakes.includes(make)) return 'suv';
+            if (sedanMakes.includes(make)) return 'sedan';
+            if (hatchbackMakes.includes(make)) return 'hatchback';
+            return 'sedan'; // default
+        }
+        
+        // Helper function to get icon from make
+        function getIconFromMake(make) {
+            const suvMakes = ['Audi', 'Toyota', 'Volvo'];
+            const hatchbackMakes = ['Volkswagen', 'Ford'];
+            
+            if (suvMakes.includes(make)) return 'fas fa-car-side';
+            if (hatchbackMakes.includes(make)) return 'fas fa-car-alt';
+            return 'fas fa-car'; // default for sedans
+        }
+        
+        // Check if car is in favorites
+        async function checkFavoriteStatus(carId, button) {
+            const token = localStorage.getItem('authToken');
+            if (!token) return;
+            
+            try {
+                const response = await fetch('/api/favorites', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const favorites = await response.json();
+                    const isFavorited = favorites.some(fav => fav.id === carId);
+                    
+                    const icon = button.querySelector('i');
+                    if (isFavorited) {
+                        icon.classList.remove('far');
+                        icon.classList.add('fas');
+                        button.innerHTML = '<i class="fas fa-heart"></i> Remove from Favorites';
+                    } else {
+                        icon.classList.remove('fas');
+                        icon.classList.add('far');
+                        button.innerHTML = '<i class="far fa-heart"></i> Add to Favorites';
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking favorite status:', error);
+            }
+        }
+        
+        // Toggle favorite
+        async function toggleFavorite(carId, button) {
+            const token = localStorage.getItem('authToken');
+            if (!token) {
+                alert('Please login to add favorites');
+                return;
+            }
+            
+            const icon = button.querySelector('i');
+            const isFavorited = icon.classList.contains('fas');
+            
+            try {
+                if (isFavorited) {
+                    // Remove from favorites
+                    const response = await fetch(`/api/favorites/${carId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        icon.classList.remove('fas');
+                        icon.classList.add('far');
+                        button.innerHTML = '<i class="far fa-heart"></i> Add to Favorites';
+                    }
+                } else {
+                    // Add to favorites
+                    const response = await fetch('/api/favorites', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ listingId: carId })
+                    });
+                    
+                    if (response.ok) {
+                        icon.classList.remove('far');
+                        icon.classList.add('fas');
+                        button.innerHTML = '<i class="fas fa-heart"></i> Remove from Favorites';
+                    } else if (response.status === 400) {
+                        // Already in favorites
+                        icon.classList.remove('far');
+                        icon.classList.add('fas');
+                        button.innerHTML = '<i class="fas fa-heart"></i> Remove from Favorites';
+                    }
+                }
+            } catch (error) {
+                console.error('Error toggling favorite:', error);
+                alert('Error updating favorites');
+            }
         }
         
         // Initialize page

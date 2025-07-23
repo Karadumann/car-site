@@ -851,6 +851,23 @@ body {
     }
 }
 
+/* Profile Section Styles */
+.profile-section {
+    display: none;
+    background: white;
+    border-radius: 10px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.profile-section.active {
+    display: block !important;
+}
+
+.profile-section:first-of-type {
+    display: block;
+}
+
 /* Smooth scrolling */
 html {
     scroll-behavior: smooth;
