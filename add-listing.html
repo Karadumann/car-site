@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Listing - AutoMax</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .add-listing-container {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 100px 20px 50px;
+        }
+        
+        .listing-form-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 3rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .form-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        .form-header h1 {
+            font-size: 2.5rem;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+        
+        .form-section {
+            margin-bottom: 2.5rem;
+        }
+        
+        .section-title {
+            font-size: 1.3rem;
+            color: #333;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .form-label {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .form-input,
+        .form-select,
+        .form-textarea {
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+        
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: #2a5298;
+            box-shadow: 0 0 0 3px rgba(42, 82, 152, 0.1);
+        }
+        
+        .form-textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        
+        .image-upload {
+            border: 2px dashed #e9ecef;
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .image-upload:hover {
+            border-color: #2a5298;
+            background: rgba(42, 82, 152, 0.05);
+        }
+        
+        .image-upload.dragover {
+            border-color: #2a5298;
+            background: rgba(42, 82, 152, 0.1);
+        }
+        
+        .upload-icon {
+            font-size: 3rem;
+            color: #2a5298;
+            margin-bottom: 1rem;
+        }
+        
+        .upload-text {
+            color: #666;
+            margin-bottom: 1rem;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .image-preview {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .preview-item {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            aspect-ratio: 1;
+        }
+        
+        .preview-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .remove-image {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(220, 53, 69, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .feature-checkbox {
+            width: 18px;
+            height: 18px;
+            accent-color: #2a5298;
+        }
+        
+        .btn-submit {
+            background: linear-gradient(135deg, #2a5298, #1e3c72);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 2rem;
+        }
+        
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(42, 82, 152, 0.3);
+        }
+        
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        
+        .success-message {
+            background: #efe;
+            color: #3c3;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .listing-form-container {
+                padding: 2rem 1.5rem;
+            }
+            
+            .add-listing-container {
+                padding: 80px 10px 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <nav class="navbar">
+            <div class="nav-brand">
+                <i class="fas fa-car"></i>
+                <span>AutoMax</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html#home">Home</a></li>
+                <li><a href="index.html#cars">Cars</a></li>
+                <li><a href="index.html#about">About</a></li>
+                <li><a href="index.html#contact">Contact</a></li>
+            </ul>
+            <div class="auth-buttons" id="authButtons">
+                <a href="login.html" class="auth-btn login-btn">Login</a>
+                <a href="register.html" class="auth-btn register-btn">Register</a>
+            </div>
+            <div class="user-menu" id="userMenu" style="display: none;">
+                <div class="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="userName">User</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="dropdown-menu">
+                    <a href="profile.html" class="dropdown-item">
+                        <i class="fas fa-user"></i> Profile
+                    </a>
+                    <a href="add-listing.html" class="dropdown-item">
+                        <i class="fas fa-plus"></i> Add Listing
+                    </a>
+                    <a href="#" class="dropdown-item" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </div>
+            </div>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </nav>
+    </header>
+    
+    <div class="add-listing-container">
+        <div class="listing-form-container">
+            <div class="form-header">
+                <h1><i class="fas fa-plus-circle"></i> Add New Listing</h1>
+                <p>Fill in the details below to list your car</p>
+            </div>
+            
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+            
+            <form id="listingForm">
+                <!-- Basic Information -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-info-circle"></i>
+                        Basic Information
+                    </h3>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-car"></i> Make
+                            </label>
+                            <select class="form-select" id="make" required>
+                                <option value="">Select Make</option>
+                                <option value="BMW">BMW</option>
+                                <option value="Mercedes">Mercedes</option>
+                                <option value="Audi">Audi</option>
+                                <option value="Toyota">Toyota</option>
+                                <option value="Honda">Honda</option>
+                                <option value="Ford">Ford</option>
+                                <option value="Volkswagen">Volkswagen</option>
+                                <option value="Nissan">Nissan</option>
+                                <option value="Hyundai">Hyundai</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-tag"></i> Model
+                            </label>
+                            <input type="text" class="form-input" id="model" placeholder="e.g., 3 Series" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-calendar"></i> Year
+                            </label>
+                            <select class="form-select" id="year" required>
+                                <option value="">Select Year</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-dollar-sign"></i> Price
+                            </label>
+                            <input type="number" class="form-input" id="price" placeholder="25000" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-road"></i> Mileage
+                            </label>
+                            <input type="number" class="form-input" id="mileage" placeholder="50000">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-palette"></i> Color
+                            </label>
+                            <input type="text" class="form-input" id="color" placeholder="e.g., Black">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Technical Details -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-cogs"></i>
+                        Technical Details
+                    </h3>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-gas-pump"></i> Fuel Type
+                            </label>
+                            <select class="form-select" id="fuelType">
+                                <option value="">Select Fuel Type</option>
+                                <option value="Gasoline">Gasoline</option>
+                                <option value="Diesel">Diesel</option>
+                                <option value="Electric">Electric</option>
+                                <option value="Hybrid">Hybrid</option>
+                                <option value="LPG">LPG</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-cog"></i> Transmission
+                            </label>
+                            <select class="form-select" id="transmission">
+                                <option value="">Select Transmission</option>
+                                <option value="Manual">Manual</option>
+                                <option value="Automatic">Automatic</option>
+                                <option value="CVT">CVT</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-tachometer-alt"></i> Engine Size (L)
+                            </label>
+                            <input type="number" class="form-input" id="engineSize" step="0.1" placeholder="2.0">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-door-open"></i> Doors
+                            </label>
+                            <select class="form-select" id="doors">
+                                <option value="">Select Doors</option>
+                                <option value="2">2 Doors</option>
+                                <option value="3">3 Doors</option>
+                                <option value="4">4 Doors</option>
+                                <option value="5">5 Doors</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Description -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-file-alt"></i>
+                        Description
+                    </h3>
+                    
+                    <div class="form-group full-width">
+                        <label class="form-label">
+                            <i class="fas fa-edit"></i> Description
+                        </label>
+                        <textarea class="form-textarea" id="description" placeholder="Describe your car's condition, features, and any additional information..."></textarea>
+                    </div>
+                </div>
+                
+                <!-- Features -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-star"></i>
+                        Features
+                    </h3>
+                    
+                    <div class="features-grid">
+                        <div class="feature-item">
+                            <input type="checkbox" class="feature-checkbox" id="airConditioning">
+                            <label for="airConditioning">Air Conditioning</label>
+                        </div>
+                        <div class="feature-item">
+                            <input type="checkbox" class="feature-checkbox" id="powerSteering">
+                            <label for="powerSteering">Power Steering</label>
+                        </div>
+                        <div class="feature-item">
+                            <input type="checkbox" class="feature-checkbox" id="powerWindows">
+                            <label for="powerWindows">Power Windows</label>
+                        </div>
+                        <div class="feature-item">
+                            <input type="checkbox" class="feature-checkbox" id="abs">
+                            <label for="abs">ABS</label>
+                        </div>
+                        <div class="feature-item">
+                            <input type="checkbox" class="feature-checkbox" id="airbags">
+                            <label for="airbags">Airbags</label>
+                        </div>
+                        <div class="feature-item">
+                            <input type="checkbox" class="feature-checkbox" id="sunroof">
+                            <label for="sunroof">Sunroof</label>
+                        </div>
+                        <div class="feature-item">
+                            <input type="checkbox" class="feature-checkbox" id="bluetooth">
+                            <label for="bluetooth">Bluetooth</label>
+                        </div>
+                        <div class="feature-item">
+                            <input type="checkbox" class="feature-checkbox" id="gps">
+                            <label for="gps">GPS Navigation</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Images -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-images"></i>
+                        Images
+                    </h3>
+                    
+                    <div class="form-group full-width">
+                        <div class="image-upload" id="imageUpload">
+                            <div class="upload-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <div class="upload-text">
+                                <strong>Click to upload</strong> or drag and drop images here
+                            </div>
+                            <div style="color: #999; font-size: 0.9rem;">
+                                Maximum 5 images, up to 5MB each
+                            </div>
+                            <input type="file" class="file-input" id="imageInput" multiple accept="image/*">
+                        </div>
+                        <div class="image-preview" id="imagePreview"></div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn-submit" id="submitBtn">
+                    <i class="fas fa-plus-circle"></i> Create Listing
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        // Check authentication
+        const token = localStorage.getItem('authToken');
+        const userData = localStorage.getItem('userData');
+        
+        if (!token || !userData) {
+            window.location.href = 'login.html';
+        }
+        
+        const user = JSON.parse(userData);
+        document.getElementById('userName').textContent = user.username;
+        
+        // Populate year dropdown
+        const yearSelect = document.getElementById('year');
+        const currentYear = new Date().getFullYear();
+        for (let year = currentYear; year >= 1990; year--) {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            yearSelect.appendChild(option);
+        }
+        
+        // Image upload functionality
+        const imageUpload = document.getElementById('imageUpload');
+        const imageInput = document.getElementById('imageInput');
+        const imagePreview = document.getElementById('imagePreview');
+        let selectedImages = [];
+        
+        imageUpload.addEventListener('click', () => {
+            imageInput.click();
+        });
+        
+        imageUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            imageUpload.classList.add('dragover');
+        });
+        
+        imageUpload.addEventListener('dragleave', () => {
+            imageUpload.classList.remove('dragover');
+        });
+        
+        imageUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            imageUpload.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+        
+        imageInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+        
+        function handleFiles(files) {
+            Array.from(files).forEach(file => {
+                if (selectedImages.length >= 5) {
+                    alert('Maximum 5 images allowed');
+                    return;
+                }
+                
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('File size must be less than 5MB');
+                    return;
+                }
+                
+                if (!file.type.startsWith('image/')) {
+                    alert('Only image files are allowed');
+                    return;
+                }
+                
+                selectedImages.push(file);
+                displayImage(file, selectedImages.length - 1);
+            });
+        }
+        
+        function displayImage(file, index) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const previewItem = document.createElement('div');
+                previewItem.className = 'preview-item';
+                previewItem.innerHTML = `
+                    <img src="${e.target.result}" class="preview-image" alt="Preview">
+                    <button type="button" class="remove-image" onclick="removeImage(${index})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                imagePreview.appendChild(previewItem);
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function removeImage(index) {
+            selectedImages.splice(index, 1);
+            imagePreview.innerHTML = '';
+            selectedImages.forEach((file, i) => {
+                displayImage(file, i);
+            });
+        }
+        
+        // Form submission
+        document.getElementById('listingForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+            
+            // Hide messages
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+            
+            // Get form data
+            const formData = new FormData();
+            
+            // Basic info
+            formData.append('make', document.getElementById('make').value);
+            formData.append('model', document.getElementById('model').value);
+            formData.append('year', document.getElementById('year').value);
+            formData.append('price', document.getElementById('price').value);
+            formData.append('mileage', document.getElementById('mileage').value);
+            formData.append('color', document.getElementById('color').value);
+            
+            // Technical details
+            formData.append('fuelType', document.getElementById('fuelType').value);
+            formData.append('transmission', document.getElementById('transmission').value);
+            formData.append('engineSize', document.getElementById('engineSize').value);
+            formData.append('doors', document.getElementById('doors').value);
+            
+            // Description
+            formData.append('description', document.getElementById('description').value);
+            
+            // Features
+            const features = [];
+            document.querySelectorAll('.feature-checkbox:checked').forEach(checkbox => {
+                features.push(checkbox.id);
+            });
+            formData.append('features', JSON.stringify(features));
+            
+            // Images
+            selectedImages.forEach((file, index) => {
+                formData.append(`image${index}`, file);
+            });
+            
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Listing...';
+            
+            try {
+                const response = await fetch('/api/listings', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    successMessage.textContent = 'Listing created successfully!';
+                    successMessage.style.display = 'block';
+                    
+                    // Reset form
+                    document.getElementById('listingForm').reset();
+                    selectedImages = [];
+                    imagePreview.innerHTML = '';
+                    
+                    // Redirect after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = 'profile.html';
+                    }, 2000);
+                } else {
+                    const error = await response.json();
+                    errorMessage.textContent = error.message || 'Failed to create listing';
+                    errorMessage.style.display = 'block';
+                }
+            } catch (error) {
+                errorMessage.textContent = 'Network error. Please try again.';
+                errorMessage.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-plus-circle"></i> Create Listing';
+            }
+        });
+        
+        // User menu functionality
+        const userMenu = document.querySelector('.user-menu');
+        const userInfo = userMenu.querySelector('.user-info');
+        
+        userInfo.addEventListener('click', () => {
+            userMenu.classList.toggle('active');
+        });
+        
+        document.addEventListener('click', (e) => {
+            if (!userMenu.contains(e.target)) {
+                userMenu.classList.remove('active');
+            }
+        });
+        
+        // Logout functionality
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userData');
+            window.location.href = 'index.html';
+        });    </script>
+    <script src="script.js"></script>
+</body>
+</html>
